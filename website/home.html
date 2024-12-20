@@ -108,14 +108,31 @@
 
         <!-- File Uploader Start -->
         <div id="file-uploader" class="file-uploader">
-            <span class="upload-head">🚀 Uploading File...</span>
-            <span id="upload-filename" class="upload-info">Filename : </span>
-            <span id="upload-filesize" class="upload-info">Filesize :</span>
-            <span id="upload-status" class="upload-info">Status : </span>
-            <span id="upload-percent" class="upload-info">Progress : </span>
+            <span class="upload-head">🚀 Uploading File</span>
+            
+            <div class="file-details">
+                <div class="file-details-row">
+                    <span class="file-details-label">Filename:</span>
+                    <span id="upload-filename" class="file-details-value">-</span>
+                </div>
+                <div class="file-details-row">
+                    <span class="file-details-label">Size:</span>
+                    <span id="upload-filesize" class="file-details-value">-</span>
+                </div>
+                <div class="file-details-row">
+                    <span class="file-details-label">Status:</span>
+                    <span id="upload-status" class="file-details-value">-</span>
+                </div>
+                <div class="file-details-row">
+                    <span class="file-details-label">Progress:</span>
+                    <span id="upload-percent" class="file-details-value">0%</span>
+                </div>
+            </div>
+
             <div class="progress">
                 <div class="progress-bar" id="progress-bar"></div>
             </div>
+            
             <div class="btn-div">
                 <button id="cancel-file-upload">Cancel Upload</button>
             </div>

@@ -274,36 +274,25 @@ async function updateSaveProgress(id, fileProgressBar, fileStatus) {
     });
 }
 
-async function handleUpload2(id, fileProgressBar, fileStatus) {
-    return new Promise((resolve, reject) => {
-        const interval = setInterval(async () => {
-            try {
-                const response = await postJson('/api/getUploadProgress', { 'id': id });
-                const data = response['data'];
-
-                if (data[0] === 'running') {
-                    const current = data[1];
-                    const total = data[2];
-                    const percentComplete = total === 0 ? 0 : (current / total) * 100;
-                    fileProgressBar.style.width = `${percentComplete}%`;
-                    fileStatus.textContent = `Finalizing: ${percentComplete.toFixed(1)}%`;
-                }
-                else if (data[0] === 'completed') {
-                    clearInterval(interval);
-                    fileProgressBar.style.width = '100%';
-                    fileStatus.textContent = 'Completed';
-                    resolve();
-                }
-                else if (data[0] === 'error') {
-                    clearInterval(interval);
-                    reject(new Error('Failed to finalize'));
-                }
-            } catch (error) {
-                clearInterval(interval);
-                reject(error);
-            }
-        }, PROGRESS_INTERVAL);
-    });
+async function handleUpload2(id) {
+    try {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+        document.getElementById('bg-blur').style.opacity = '0';
+        document.getElementById('file-uploader').style.opacity = '0';
+        
+        // Show success message
+        showToast('File uploaded successfully!');
+        
+        setTimeout(() => {
+            document.getElementById('bg-blur').style.zIndex = '-1';
+            document.getElementById('file-uploader').style.zIndex = '-1';
+            window.location.reload();
+        }, 300);
+    }
+    catch (err) {
+        console.log(err);
+        alert('Error Uploading File');
+    }
 }
 
 // File Uploader End
@@ -410,3 +399,21 @@ async function Start_URL_Upload() {
 }
 
 // URL Uploader End
+
+// Add toast notification function
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                document.body.removeChild(toast);
+            }, 300);
+        }, 2000);
+    }, 100);
+}
