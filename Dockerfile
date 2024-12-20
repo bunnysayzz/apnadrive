@@ -4,6 +4,13 @@ FROM python:3.11.7-slim AS base
 # Set the working directory inside the container
 WORKDIR /app
 
+# Install system dependencies required for Pillow
+RUN apt-get update && apt-get install -y \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy the requirements file to the working directory and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
