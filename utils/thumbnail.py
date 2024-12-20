@@ -76,13 +76,13 @@ async def generate_thumbnail(file):
                         os.remove(temp_path)
 
             except Exception as e:
-                logger.error(f"Video thumbnail generation failed: {str(e)}\n{traceback.format_exc()}")
+                logger.error(f"Video thumbnail generation failed: {str(e)}")
                 return create_default_thumbnail("Video Preview\nNot Available")
 
         return create_default_thumbnail("Preview\nNot Available")
 
     except Exception as e:
-        logger.error(f"Thumbnail generation failed: {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"Thumbnail generation failed: {str(e)}")
         return create_default_thumbnail("Error")
 
 async def process_image_thumbnail(file_path):

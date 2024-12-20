@@ -7,4 +7,5 @@ aiofiles==23.2.1
 aiohttp==3.9.5
 curl_cffi
 techzdl>=1.2.6
-Pillow==9.0.1
+Pillow>=9.5.0
+python-multipart

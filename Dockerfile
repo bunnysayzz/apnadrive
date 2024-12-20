@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libc-dev \
     ffmpeg \
+    libavcodec-extra \
+    libavformat-dev \
+    libavutil-dev \
+    libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file to the working directory and install dependencies
