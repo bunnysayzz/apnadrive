@@ -3,7 +3,7 @@ tgcrypto
 uvicorn
 fastapi[all]
 python-dotenv
-aiofiles
-aiohttp
+aiofiles==23.2.1
+aiohttp==3.9.5
 curl_cffi
 techzdl>=1.2.6

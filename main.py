@@ -354,3 +354,17 @@ async def getFolderShareAuth(request: Request):
         return JSONResponse({"status": "ok", "auth": auth})
     except:
         return JSONResponse({"status": "not found"})
+
+
+@app.get("/api/thumbnail")
+async def get_thumbnail(path: str):
+    from utils.directoryHandler import DRIVE_DATA
+    from utils.thumbnail import generate_thumbnail
+    
+    try:
+        file = DRIVE_DATA.get_file(path)
+        thumbnail = await generate_thumbnail(file)
+        return Response(content=thumbnail, media_type="image/jpeg")
+    except Exception as e:
+        logger.error(f"Thumbnail generation error: {e}")
+        return Response(status_code=404)
