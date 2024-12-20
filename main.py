@@ -172,12 +172,12 @@ async def upload_file(
     file_size = 0
 
     async with aiofiles.open(file_location, "wb") as buffer:
-        while chunk := await file.read(1024 * 1024):  # Read file in chunks of 1MB
+        while chunk := await file.read(1024 * 1024):
             SAVE_PROGRESS[id] = ("running", file_size, total_size)
             file_size += len(chunk)
             if file_size > MAX_FILE_SIZE:
                 await buffer.close()
-                file_location.unlink()  # Delete the partially written file
+                file_location.unlink()
                 raise HTTPException(
                     status_code=400,
                     detail=f"File size exceeds {MAX_FILE_SIZE} bytes limit",

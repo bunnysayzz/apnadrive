@@ -105,8 +105,11 @@ async function getFolderShareAuth(path) {
 }
 
 // File Uploader Start
-
-const MAX_FILE_SIZE = MAX_FILE_SIZE__SDGJDG // Will be replaced by the python
+const MAX_FILE_SIZE = MAX_FILE_SIZE__SDGJDG 
+const BATCH_SIZE = 10; // Number of concurrent uploads
+let activeUploads = 0;
+let uploadQueue = [];
+let isProcessingQueue = false;
 
 const fileInput = document.getElementById('fileInput');
 const progressBar = document.getElementById('progress-bar');
@@ -115,60 +118,180 @@ const uploadPercent = document.getElementById('upload-percent');
 let uploadRequest = null;
 let uploadStep = 0;
 let uploadID = null;
+let isUploading = false;
 
 fileInput.addEventListener('change', async (e) => {
-    const file = fileInput.files[0];
+    if (isUploading) return;
+    isUploading = true;
+    
+    const files = Array.from(fileInput.files);
+    let successCount = 0;
+    let failedFiles = [];
+    let totalFiles = files.length;
 
-    if (file.size > MAX_FILE_SIZE) {
-        alert(`File size exceeds ${(MAX_FILE_SIZE / (1024 * 1024 * 1024)).toFixed(2)} GB limit`);
-        return;
-    }
-
-    // Showing file uploader
+    // Show file uploader UI
     document.getElementById('bg-blur').style.zIndex = '2';
     document.getElementById('bg-blur').style.opacity = '0.1';
     document.getElementById('file-uploader').style.zIndex = '3';
     document.getElementById('file-uploader').style.opacity = '1';
 
-    document.getElementById('upload-filename').innerText = 'Filename: ' + file.name;
-    document.getElementById('upload-filesize').innerText = 'Filesize: ' + (file.size / (1024 * 1024)).toFixed(2) + ' MB';
-    document.getElementById('upload-status').innerText = 'Status: Uploading To Backend Server';
+    // Create files list UI
+    const filesListHTML = files.map(file => 
+        `<div class="upload-file-item" id="file-${file.name.replace(/[^a-zA-Z0-9]/g, '_')}">
+            <div class="file-info">
+                <span class="file-name">${file.name}</span>
+                <span class="file-size">(${(file.size / (1024 * 1024)).toFixed(2)} MB)</span>
+            </div>
+            <div class="file-progress">
+                <div class="progress-mini">
+                    <div class="progress-bar-mini"></div>
+                </div>
+                <span class="status">Waiting...</span>
+            </div>
+        </div>`
+    ).join('');
 
+    document.getElementById('upload-filename').innerHTML = 
+        `<div class="upload-files-list">${filesListHTML}</div>`;
+    document.getElementById('upload-status').innerText = `Queued ${totalFiles} Files`;
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('path', getCurrentPath());
-    formData.append('password', getPassword());
-    const id = getRandomId();
-    formData.append('id', id);
-    formData.append('total_size', file.size);
+    // Initialize upload queue
+    uploadQueue = files.map(file => ({
+        file,
+        status: 'queued',
+        element: document.getElementById(`file-${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`),
+        retries: 0
+    }));
 
-    uploadStep = 1;
-    uploadRequest = new XMLHttpRequest();
-    uploadRequest.open('POST', '/api/upload', true);
-
-    uploadRequest.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-            const percentComplete = (e.loaded / e.total) * 100;
-            progressBar.style.width = percentComplete + '%';
-            uploadPercent.innerText = 'Progress : ' + percentComplete.toFixed(2) + '%';
-        }
-    });
-
-    uploadRequest.upload.addEventListener('load', async () => {
-        await updateSaveProgress(id)
-    });
-
-    uploadRequest.upload.addEventListener('error', () => {
-        alert('Upload failed');
-        window.location.reload();
-    });
-
-    uploadRequest.send(formData);
+    // Start processing queue
+    processQueue(successCount, failedFiles, totalFiles);
 });
 
+async function processQueue(successCount, failedFiles, totalFiles) {
+    if (isProcessingQueue) return;
+    isProcessingQueue = true;
+
+    while (uploadQueue.length > 0) {
+        // Process up to BATCH_SIZE files concurrently
+        const batch = uploadQueue.splice(0, BATCH_SIZE);
+        const uploadPromises = batch.map(item => uploadFile(item, successCount, failedFiles, totalFiles));
+        
+        try {
+            await Promise.all(uploadPromises);
+        } catch (error) {
+            console.error('Batch upload error:', error);
+        }
+
+        // Update status
+        document.getElementById('upload-status').innerText = 
+            `Progress: ${successCount}/${totalFiles} Files (${uploadQueue.length} remaining)`;
+    }
+
+    // Show final status with a single alert
+    const finalMessage = successCount === totalFiles ? 
+        `Successfully uploaded all ${totalFiles} files!` :
+        `Uploaded ${successCount} out of ${totalFiles} files.\nFailed files: ${failedFiles.join(', ')}`;
+
+    document.getElementById('upload-status').innerText = 'Upload Complete';
+    document.getElementById('upload-percent').innerText = finalMessage;
+
+    // Show single alert at the end
+    alert(finalMessage);
+
+    // Auto close after 5 seconds
+    setTimeout(() => {
+        window.location.reload();
+    }, 5000);
+    
+    isUploading = false;
+    isProcessingQueue = false;
+}
+
+async function uploadFile(item, successCount, failedFiles, totalFiles) {
+    const { file, element, retries } = item;
+    const fileProgressBar = element.querySelector('.progress-bar-mini');
+    const fileStatus = element.querySelector('.status');
+
+    if (file.size > MAX_FILE_SIZE) {
+        fileStatus.innerHTML = `<span class="error">Exceeds ${(MAX_FILE_SIZE / (1024 * 1024 * 1024)).toFixed(2)} GB limit</span>`;
+        failedFiles.push(file.name);
+        return;
+    }
+
+    try {
+        fileStatus.textContent = 'Uploading...';
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('path', getCurrentPath());
+        formData.append('password', getPassword());
+        const id = getRandomId();
+        formData.append('id', id);
+        formData.append('total_size', file.size);
+
+        uploadStep = 1;
+        uploadRequest = new XMLHttpRequest();
+        uploadRequest.open('POST', '/api/upload', true);
+
+        await new Promise((resolve, reject) => {
+            let uploadComplete = false;
+
+            uploadRequest.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    fileProgressBar.style.width = `${percentComplete}%`;
+                }
+            });
+
+            uploadRequest.upload.addEventListener('load', async () => {
+                if (uploadComplete) return; // Prevent duplicate processing
+                uploadComplete = true;
+                
+                try {
+                    await updateSaveProgress(id, fileProgressBar, fileStatus);
+                    successCount++;
+                    element.classList.add('completed');
+                    resolve();
+                } catch (err) {
+                    if (retries < 2) {
+                        uploadQueue.push({...item, retries: retries + 1});
+                    } else {
+                        fileStatus.innerHTML = `<span class="error">Failed: ${err.message}</span>`;
+                        failedFiles.push(file.name);
+                    }
+                    reject(err);
+                }
+            });
+
+            uploadRequest.upload.addEventListener('error', () => {
+                if (uploadComplete) return;
+                uploadComplete = true;
+
+                if (retries < 2) {
+                    uploadQueue.push({...item, retries: retries + 1});
+                } else {
+                    fileStatus.innerHTML = '<span class="error">Upload failed</span>';
+                    failedFiles.push(file.name);
+                }
+                reject(new Error(`Upload failed for file: ${file.name}`));
+            });
+
+            uploadRequest.send(formData);
+        });
+
+    } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+        if (retries < 2) {
+            uploadQueue.push({...item, retries: retries + 1});
+        } else {
+            fileStatus.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            failedFiles.push(file.name);
+        }
+    }
+}
+
 cancelButton.addEventListener('click', () => {
-    if (uploadStep === 1) {
+    if (uploadStep === 1 && uploadRequest) {
         uploadRequest.abort();
     } else if (uploadStep === 2) {
         const data = { 'id': uploadID }
@@ -178,67 +301,79 @@ cancelButton.addEventListener('click', () => {
     window.location.reload();
 });
 
-async function updateSaveProgress(id) {
-    console.log('save progress')
-    progressBar.style.width = '0%';
-    uploadPercent.innerText = 'Progress : 0%'
-    document.getElementById('upload-status').innerText = 'Status: Processing File On Backend Server';
+async function updateSaveProgress(id, fileProgressBar, fileStatus) {
+    fileStatus.textContent = 'Processing...';
+    
+    return new Promise((resolve, reject) => {
+        const interval = setInterval(async () => {
+            try {
+                const response = await postJson('/api/getSaveProgress', { 'id': id });
+                const data = response['data'];
 
-    const interval = setInterval(async () => {
-        const response = await postJson('/api/getSaveProgress', { 'id': id })
-        const data = response['data']
-
-        if (data[0] === 'running') {
-            const current = data[1];
-            const total = data[2];
-            document.getElementById('upload-filesize').innerText = 'Filesize: ' + (total / (1024 * 1024)).toFixed(2) + ' MB';
-
-            const percentComplete = (current / total) * 100;
-            progressBar.style.width = percentComplete + '%';
-            uploadPercent.innerText = 'Progress : ' + percentComplete.toFixed(2) + '%';
-        }
-        else if (data[0] === 'completed') {
-            clearInterval(interval);
-            uploadPercent.innerText = 'Progress : 100%'
-            progressBar.style.width = '100%';
-
-            await handleUpload2(id)
-        }
-    }, 3000)
-
+                if (data[0] === 'running') {
+                    const current = data[1];
+                    const total = data[2];
+                    const percentComplete = (current / total) * 100;
+                    fileProgressBar.style.width = `${percentComplete}%`;
+                }
+                else if (data[0] === 'completed') {
+                    clearInterval(interval);
+                    fileProgressBar.style.width = '100%';
+                    fileStatus.textContent = 'Uploading to server...';
+                    
+                    try {
+                        await handleUpload2(id, fileProgressBar, fileStatus);
+                        fileStatus.textContent = 'Completed';
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                }
+                else if (data[0] === 'error') {
+                    clearInterval(interval);
+                    reject(new Error('Upload failed during processing'));
+                }
+            } catch (error) {
+                clearInterval(interval);
+                reject(error);
+            }
+        }, 3000);
+    });
 }
 
-async function handleUpload2(id) {
+async function handleUpload2(id, fileProgressBar, fileStatus) {
     console.log(id)
-    document.getElementById('upload-status').innerText = 'Status: Uploading To Telegram Server';
-    progressBar.style.width = '0%';
-    uploadPercent.innerText = 'Progress : 0%';
+    fileStatus.textContent = 'Uploading to Telegram...';
+    
+    return new Promise((resolve, reject) => {
+        const interval = setInterval(async () => {
+            try {
+                const response = await postJson('/api/getUploadProgress', { 'id': id });
+                const data = response['data'];
 
-    const interval = setInterval(async () => {
-        const response = await postJson('/api/getUploadProgress', { 'id': id })
-        const data = response['data']
+                if (data[0] === 'running') {
+                    const current = data[1];
+                    const total = data[2];
 
-        if (data[0] === 'running') {
-            const current = data[1];
-            const total = data[2];
-            document.getElementById('upload-filesize').innerText = 'Filesize: ' + (total / (1024 * 1024)).toFixed(2) + ' MB';
-
-            let percentComplete
-            if (total === 0) {
-                percentComplete = 0
+                    let percentComplete = total === 0 ? 0 : (current / total) * 100;
+                    fileProgressBar.style.width = `${percentComplete}%`;
+                }
+                else if (data[0] === 'completed') {
+                    clearInterval(interval);
+                    fileProgressBar.style.width = '100%';
+                    fileStatus.textContent = 'Completed';
+                    resolve();
+                }
+                else if (data[0] === 'error') {
+                    clearInterval(interval);
+                    reject(new Error('Failed to upload to Telegram'));
+                }
+            } catch (error) {
+                clearInterval(interval);
+                reject(error);
             }
-            else {
-                percentComplete = (current / total) * 100;
-            }
-            progressBar.style.width = percentComplete + '%';
-            uploadPercent.innerText = 'Progress : ' + percentComplete.toFixed(2) + '%';
-        }
-        else if (data[0] === 'completed') {
-            clearInterval(interval);
-            alert('Upload Completed')
-            window.location.reload();
-        }
-    }, 3000)
+        }, 3000);
+    });
 }
 
 // File Uploader End
