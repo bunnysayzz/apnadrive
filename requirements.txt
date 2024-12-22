@@ -9,3 +9,4 @@ curl_cffi
 techzdl>=1.2.6
 Pillow>=9.5.0
 python-multipart
+ffmpeg-python
