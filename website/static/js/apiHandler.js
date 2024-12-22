@@ -150,7 +150,7 @@ fileInput.addEventListener('change', async (e) => {
 
     document.getElementById('upload-filename').innerHTML = 
         `<div class="upload-files-list">${filesListHTML}</div>`;
-    document.getElementById('upload-status').innerText = `Uploading files one by one`;
+    document.getElementById('upload-status').innerText = `Processing files one by one`;
 
     // Process files sequentially
     for (let i = 0; i < files.length; i++) {
@@ -160,7 +160,13 @@ fileInput.addEventListener('change', async (e) => {
         try {
             await uploadFile(file, fileElement);
             successCount++;
+            
+            // Update overall progress
+            const overallProgress = (successCount / totalFiles) * 100;
+            document.getElementById('progress-bar').style.width = `${overallProgress}%`;
             document.getElementById('upload-status').innerText = `Completed ${successCount}/${totalFiles} files`;
+            document.getElementById('upload-percent').innerText = `${overallProgress.toFixed(1)}%`;
+            
         } catch (error) {
             console.error(`Failed to upload ${file.name}:`, error);
             failedFiles.push(file.name);
@@ -174,12 +180,10 @@ fileInput.addEventListener('change', async (e) => {
 
     document.getElementById('upload-status').innerText = 'Upload Complete';
     document.getElementById('upload-percent').innerText = finalMessage;
-    alert(finalMessage);
 
-    // Auto close after 5 seconds
-    setTimeout(() => {
-        window.location.reload();
-    }, 5000);
+    // Add reload button
+    const btnDiv = document.querySelector('.btn-div');
+    btnDiv.innerHTML = '<button onclick="window.location.reload()" class="reload-btn">Refresh Page</button>';
     
     isUploading = false;
 });
@@ -193,105 +197,100 @@ async function uploadFile(file, element) {
         throw new Error('File too large');
     }
 
-    fileStatus.textContent = 'Uploading...';
+    try {
+        // Phase 1: Initial Upload with Parallel Processing
+        fileStatus.textContent = 'Starting upload...';
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('path', getCurrentPath());
+        formData.append('password', getPassword());
+        const id = getRandomId();
+        formData.append('id', id);
+        formData.append('total_size', file.size);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('path', getCurrentPath());
-    formData.append('password', getPassword());
-    const id = getRandomId();
-    formData.append('id', id);
-    formData.append('total_size', file.size);
+        // Start monitoring both upload and processing progress immediately
+        const uploadPromise = new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    fileProgressBar.style.width = `${percentComplete}%`;
+                    fileStatus.textContent = `Uploading: ${percentComplete.toFixed(1)}%`;
+                }
+            };
 
-    uploadStep = 1;
-    uploadRequest = new XMLHttpRequest();
-    uploadRequest.open('POST', '/api/upload', true);
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    resolve();
+                } else {
+                    reject(new Error('Upload failed'));
+                }
+            };
 
-    await new Promise((resolve, reject) => {
-        uploadRequest.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-                const percentComplete = (e.loaded / e.total) * 100;
-                fileProgressBar.style.width = `${percentComplete}%`;
-                fileStatus.textContent = `Uploading: ${percentComplete.toFixed(1)}%`;
-            }
+            xhr.onerror = () => reject(new Error('Upload failed'));
+            
+            xhr.open('POST', '/api/upload', true);
+            xhr.send(formData);
         });
 
-        uploadRequest.onload = async () => {
-            if (uploadRequest.status === 200) {
+        // Monitor processing in parallel with upload
+        const processPromise = new Promise((resolve, reject) => {
+            let processingStarted = false;
+            
+            const checkProgress = async () => {
                 try {
-                    await processUpload(id, fileProgressBar, fileStatus);
-                    element.classList.add('completed');
-                    resolve();
-                } catch (err) {
-                    reject(err);
+                    // Check save progress
+                    const saveResponse = await postJson('/api/getSaveProgress', { 'id': id });
+                    if (saveResponse?.status === 'ok') {
+                        const saveData = saveResponse.data;
+                        if (!processingStarted && saveData[0] === 'running') {
+                            processingStarted = true;
+                            fileStatus.textContent = 'Processing...';
+                        }
+                        
+                        if (saveData[0] === 'completed') {
+                            // Move to upload progress check
+                            const uploadResponse = await postJson('/api/getUploadProgress', { 'id': id });
+                            if (uploadResponse?.status === 'ok') {
+                                const uploadData = uploadResponse.data;
+                                if (uploadData[0] === 'completed') {
+                                    fileProgressBar.style.width = '100%';
+                                    fileStatus.textContent = 'Completed';
+                                    resolve();
+                                    return;
+                                } else if (uploadData[0] === 'error') {
+                                    reject(new Error('Processing failed'));
+                                    return;
+                                }
+                            }
+                        } else if (saveData[0] === 'error') {
+                            reject(new Error('Processing failed'));
+                            return;
+                        }
+                    }
+                    
+                    // Continue checking progress
+                    setTimeout(checkProgress, 500); // Check every 500ms
+                } catch (error) {
+                    reject(error);
                 }
-            } else {
-                reject(new Error('Upload failed'));
-            }
-        };
+            };
+            
+            // Start progress monitoring
+            checkProgress();
+        });
 
-        uploadRequest.onerror = () => {
-            fileStatus.innerHTML = '<span class="error">Upload failed</span>';
-            reject(new Error('Upload failed'));
-        };
-
-        uploadRequest.send(formData);
-    });
-}
-
-async function processUpload(id, fileProgressBar, fileStatus) {
-    await updateSaveProgress(id, fileProgressBar, fileStatus);
-    await handleUpload2(id, fileProgressBar, fileStatus);
-}
-
-async function updateSaveProgress(id, fileProgressBar, fileStatus) {
-    return new Promise((resolve, reject) => {
-        const interval = setInterval(async () => {
-            try {
-                const response = await postJson('/api/getSaveProgress', { 'id': id });
-                const data = response['data'];
-
-                if (data[0] === 'running') {
-                    const current = data[1];
-                    const total = data[2];
-                    const percentComplete = (current / total) * 100;
-                    fileProgressBar.style.width = `${percentComplete}%`;
-                    fileStatus.textContent = `Processing: ${percentComplete.toFixed(1)}%`;
-                }
-                else if (data[0] === 'completed') {
-                    clearInterval(interval);
-                    resolve();
-                }
-                else if (data[0] === 'error') {
-                    clearInterval(interval);
-                    reject(new Error('Processing failed'));
-                }
-            } catch (error) {
-                clearInterval(interval);
-                reject(error);
-            }
-        }, PROGRESS_INTERVAL);
-    });
-}
-
-async function handleUpload2(id) {
-    try {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
-        document.getElementById('bg-blur').style.opacity = '0';
-        document.getElementById('file-uploader').style.opacity = '0';
+        // Wait for both upload and processing to complete
+        await Promise.all([uploadPromise, processPromise]);
         
-        // Show success message
-        showToast('File uploaded successfully!');
-        
-        setTimeout(() => {
-            document.getElementById('bg-blur').style.zIndex = '-1';
-            document.getElementById('file-uploader').style.zIndex = '-1';
-            window.location.reload();
-        }, 300);
-    }
-    catch (err) {
-        console.log(err);
-        alert('Error Uploading File');
+        element.classList.add('completed');
+        showToast(`${file.name} uploaded successfully!`);
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        fileStatus.innerHTML = `<span class="error">${error.message}</span>`;
+        throw error;
     }
 }
 
