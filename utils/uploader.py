@@ -74,15 +74,19 @@ async def start_file_uploader(file_path, id, directory_path, filename, file_size
 
     logger.info(f"Uploading file {file_path} {id}")
 
-    # Check if file is video and compress if needed
+    # Always compress videos
     ext = Path(file_path).suffix.lower()
     video_extensions = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm']
-    
+
     if ext in video_extensions:
         logger.info(f"Compressing video {file_path}")
         PROGRESS_CACHE[id] = ("compressing", 0, file_size)
         compressed_path = await compress_video(file_path)
+        
+        # Update file_path and file_size after compression
         file_path = compressed_path
+        file_size = os.path.getsize(file_path)  # Get new size after compression
+        
         logger.info(f"Video compressed to {file_path}")
 
     if file_size > 1.98 * 1024 * 1024 * 1024:
@@ -93,32 +97,38 @@ async def start_file_uploader(file_path, id, directory_path, filename, file_size
 
     PROGRESS_CACHE[id] = ("running", 0, 0)
 
-    message: Message = await client.send_document(
-        STORAGE_CHANNEL,
-        file_path,
-        progress=progress_callback,
-        progress_args=(id, client, file_path),
-        disable_notification=True,
-    )
-    
-    size = (
-        message.photo
-        or message.document
-        or message.video
-        or message.audio
-        or message.sticker
-    ).file_size
-
-    filename = unquote_plus(filename)
-
-    DRIVE_DATA.new_file(directory_path, filename, message.id, size)
-    PROGRESS_CACHE[id] = ("completed", size, size)
-
     try:
-        os.remove(file_path)
-        if file_path.endswith('.compressed.mp4'):
-            # Also remove original file if this was compressed
-            os.remove(file_path.replace('.compressed.mp4', Path(file_path).suffix))
-    except:
-        pass
-    logger.info(f"Uploaded file {file_path} {id}")
+        message: Message = await client.send_document(
+            STORAGE_CHANNEL,
+            file_path,
+            progress=progress_callback,
+            progress_args=(id, client, file_path),
+            disable_notification=True,
+        )
+
+        size = (
+            message.photo
+            or message.document
+            or message.video
+            or message.audio
+            or message.sticker
+        ).file_size
+
+        filename = unquote_plus(filename)
+
+        DRIVE_DATA.new_file(directory_path, filename, message.id, size)
+        PROGRESS_CACHE[id] = ("completed", size, size)
+        logger.info(f"Uploaded file {file_path} {id}")
+
+    except Exception as e:
+        logger.error(f"Failed to upload file {file_path} {id}: {e}")
+        PROGRESS_CACHE[id] = ("error", 0, 0)
+
+    finally:
+        # Ensure cache is cleared even if upload fails
+        try:
+            os.remove(file_path)
+            if 'compressed_path' in locals() and file_path != compressed_path:
+                os.remove(compressed_path.replace('.compressed.mp4', Path(compressed_path).suffix))
+        except Exception as e:
+            logger.error(f"Failed to remove file {file_path}: {e}")

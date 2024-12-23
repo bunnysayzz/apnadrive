@@ -30,7 +30,7 @@ async def initialize_clients():
             logger.info(f"Starting - {type.title()} Client {client_id}")
 
             if type == "bot":
-                client = await Client(
+                client = Client(
                     name=str(client_id),
                     api_id=config.API_ID,
                     api_hash=config.API_HASH,
@@ -38,15 +38,9 @@ async def initialize_clients():
                     sleep_threshold=config.SLEEP_THRESHOLD,
                     workdir=session_cache_path,
                     no_updates=True,
-                ).start()
-                await client.send_message(
-                    config.STORAGE_CHANNEL,
-                    f"Started - {type.title()} Client {client_id}",
                 )
-                multi_clients[client_id] = client
-                work_loads[client_id] = 0
             elif type == "user":
-                client = await Client(
+                client = Client(
                     name=str(client_id),
                     api_id=config.API_ID,
                     api_hash=config.API_HASH,
@@ -54,15 +48,27 @@ async def initialize_clients():
                     sleep_threshold=config.SLEEP_THRESHOLD,
                     workdir=session_cache_path,
                     no_updates=True,
-                ).start()
+                )
+
+            # Check if the client is already connected before starting
+            if not client.is_connected:
+                await client.start()
                 await client.send_message(
                     config.STORAGE_CHANNEL,
                     f"Started - {type.title()} Client {client_id}",
                 )
-                premium_clients[client_id] = client
-                premium_work_loads[client_id] = 0
 
-            logger.info(f"Started - {type.title()} Client {client_id}")
+                if type == "bot":
+                    multi_clients[client_id] = client
+                    work_loads[client_id] = 0
+                elif type == "user":
+                    premium_clients[client_id] = client
+                    premium_work_loads[client_id] = 0
+
+                logger.info(f"Started - {type.title()} Client {client_id}")
+            else:
+                logger.info(f"Client {client_id} is already connected, skipping start.")
+
         except Exception as e:
             logger.error(
                 f"Failed To Start {type.title()} Client - {client_id} Error: {e}"
