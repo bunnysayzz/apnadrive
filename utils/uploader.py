@@ -14,30 +14,15 @@ PROGRESS_CACHE = {}
 STOP_TRANSMISSION = []
 
 async def compress_video(input_path: str) -> str:
-    """Compress video to target size of ~5MB while maintaining quality"""
+    """Compress video to reduce size while maintaining quality"""
     try:
-        # Get video info
-        probe = await asyncio.create_subprocess_exec(
-            'ffprobe', '-v', 'error', '-show_entries',
-            'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1',
-            input_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await probe.communicate()
-        duration = float(stdout.decode().strip())
-
-        # Calculate target bitrate for ~5MB file
-        target_size = 5 * 1024 * 1024 * 8  # 5MB in bits
-        bitrate = int(target_size / duration)
-
         output_path = str(Path(input_path).with_suffix('.compressed.mp4'))
         
         # Compress video using ffmpeg
         process = await asyncio.create_subprocess_exec(
             'ffmpeg', '-i', input_path,
             '-c:v', 'libx264', '-preset', 'medium',
-            '-b:v', f'{bitrate}',
+            '-crf', '28',  # Adjust CRF for quality vs. size trade-off
             '-c:a', 'aac', '-b:a', '128k',
             output_path,
             stdout=asyncio.subprocess.PIPE,

@@ -65,11 +65,12 @@ def reset_cache_dir():
             ".session-journal" in file_path.name
             or ".session" in file_path.name
             or ".data" in file_path.name
+            or file_path.suffix in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm']
         ):
             try:
                 file_path.unlink()
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to remove cache file {file_path}: {e}")
 
 
 def parse_content_disposition(content_disposition):
