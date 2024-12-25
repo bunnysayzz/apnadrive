@@ -162,32 +162,19 @@ document.getElementById('search-form').addEventListener('submit', async (event) 
 
 // Loading Main Page
 
-document.addEventListener('DOMContentLoaded', async function () {
+document.addEventListener('DOMContentLoaded', function () {
     const inputs = ['new-folder-name', 'rename-name', 'file-search']
     for (let i = 0; i < inputs.length; i++) {
         document.getElementById(inputs[i]).addEventListener('input', validateInput);
     }
 
-    // Add event listener for page unload/close
-    window.addEventListener('unload', async () => {
-        try {
-            // Send a synchronous request to logout
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/logout', false);  // false makes it synchronous
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send();
-        } catch (err) {
-            console.error('Logout failed:', err);
-        }
-    });
-
     if (getCurrentPath().includes('/share_')) {
         getCurrentDirectory()
     } else {
-        const isLoggedIn = await checkSession()
-        if (!isLoggedIn) {
+        if (getPassword() === null) {
             document.getElementById('bg-blur').style.zIndex = '2';
             document.getElementById('bg-blur').style.opacity = '0.1';
+
             document.getElementById('get-password').style.zIndex = '3';
             document.getElementById('get-password').style.opacity = '1';
         } else {

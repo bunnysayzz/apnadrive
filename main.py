@@ -16,11 +16,6 @@ from utils.streamer import media_streamer
 from utils.uploader import start_file_uploader
 from utils.logger import Logger
 import urllib.parse
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from starlette.config import Config
-from datetime import datetime, timedelta
-import secrets
 
 
 # Startup Event
@@ -40,23 +35,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
 logger = Logger(__name__)
-
-app.add_middleware(
-    SessionMiddleware, 
-    secret_key=secrets.token_urlsafe(32),
-    session_cookie="session",
-    max_age=1800,  # Session expires after 30 minutes (1800 seconds)
-    same_site="lax",  # Provides some CSRF protection
-    https_only=False  # Set to True if using HTTPS
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.get("/")
@@ -95,31 +73,8 @@ async def dl_file(request: Request):
 async def check_password(request: Request):
     data = await request.json()
     if data["pass"] == ADMIN_PASSWORD:
-        # Set session with timestamp
-        request.session["admin_logged_in"] = True
-        request.session["last_activity"] = datetime.now().isoformat()
         return JSONResponse({"status": "ok"})
     return JSONResponse({"status": "Invalid password"})
-
-
-async def check_admin_auth(request: Request) -> bool:
-    """Helper function to check if user is authenticated as admin"""
-    is_logged_in = request.session.get("admin_logged_in", False)
-    last_activity = request.session.get("last_activity")
-    
-    if not is_logged_in:
-        return False
-        
-    # Check if session has expired (30 minutes)
-    if last_activity:
-        last_activity = datetime.fromisoformat(last_activity)
-        if (datetime.now() - last_activity) > timedelta(minutes=30):
-            request.session.clear()
-            return False
-            
-    # Update last activity time
-    request.session["last_activity"] = datetime.now().isoformat()
-    return True
 
 
 @app.post("/api/createNewFolder")
@@ -127,9 +82,9 @@ async def api_new_folder(request: Request):
     from utils.directoryHandler import DRIVE_DATA
 
     data = await request.json()
-    
-    if not await check_admin_auth(request):
-        return JSONResponse({"status": "Unauthorized"})
+
+    if data["password"] != ADMIN_PASSWORD:
+        return JSONResponse({"status": "Invalid password"})
 
     logger.info(f"createNewFolder {data}")
     folder_data = DRIVE_DATA.get_directory(data["path"]).contents
@@ -152,8 +107,12 @@ async def api_get_directory(request: Request):
     from utils.directoryHandler import DRIVE_DATA
 
     data = await request.json()
-    
-    is_admin = await check_admin_auth(request)
+
+    if data["password"] == ADMIN_PASSWORD:
+        is_admin = True
+    else:
+        is_admin = False
+
     auth = data.get("auth")
 
     logger.info(f"getFolder {data}")
@@ -192,12 +151,14 @@ SAVE_PROGRESS = {}
 async def upload_file(
     file: UploadFile = File(...),
     path: str = Form(...),
+    password: str = Form(...),
     id: str = Form(...),
     total_size: str = Form(...),
 ):
-    # Check session auth
-    if not await check_admin_auth(request):
-        return JSONResponse({"status": "Unauthorized"})
+    global SAVE_PROGRESS
+
+    if password != ADMIN_PASSWORD:
+        return JSONResponse({"status": "Invalid password"})
 
     total_size = int(total_size)
     SAVE_PROGRESS[id] = ("running", 0, total_size)
@@ -407,16 +368,3 @@ async def get_thumbnail(path: str):
     except Exception as e:
         logger.error(f"Thumbnail generation error: {e}")
         return Response(status_code=404)
-
-
-@app.post("/api/checkSession")
-async def check_session(request: Request):
-    if request.session.get("admin_logged_in"):
-        return JSONResponse({"status": "ok"})
-    return JSONResponse({"status": "not_logged_in"})
-
-
-@app.post("/api/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return JSONResponse({"status": "ok"})
