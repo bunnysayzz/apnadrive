@@ -461,10 +461,29 @@ async function logout() {
     }
 }
 
-// Add periodic session check
-setInterval(async () => {
+// Update session check interval
+const checkSessionStatus = async () => {
     const isLoggedIn = await checkSession();
     if (!isLoggedIn) {
         window.location.reload();
     }
-}, 60000); // Check every minute
+};
+
+// Check session every minute
+setInterval(checkSessionStatus, 60000);
+
+// Check session on tab focus
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        checkSessionStatus();
+    }
+});
+
+// Check session on mouse movement/activity
+let lastActivity = Date.now();
+document.addEventListener('mousemove', () => {
+    if (Date.now() - lastActivity > 60000) {  // Only check if last check was > 1 minute ago
+        lastActivity = Date.now();
+        checkSessionStatus();
+    }
+});
