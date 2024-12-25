@@ -1,14 +1,33 @@
 // Api Fuctions
 async function postJson(url, data) {
-    data['password'] = getPassword()
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    })
-    return await response.json()
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+
+        const json = await response.json();
+        
+        if (json.status === 'Unauthorized') {
+            // Clear any local state
+            window.location.reload();
+            return null;
+        }
+        
+        return json;
+    } catch (error) {
+        console.error('API Error:', error);
+        window.location.reload();
+        return null;
+    }
 }
 
 document.getElementById('pass-login').addEventListener('click', async () => {
@@ -16,14 +35,12 @@ document.getElementById('pass-login').addEventListener('click', async () => {
     const data = { 'pass': password }
     const json = await postJson('/api/checkPassword', data)
     if (json.status === 'ok') {
-        localStorage.setItem('password', password)
         alert('Logged In Successfully')
         window.location.reload()
     }
     else {
         alert('Wrong Password')
     }
-
 })
 
 async function getCurrentDirectory() {
@@ -45,7 +62,6 @@ async function getCurrentDirectory() {
 
                 if (removeSlash(json['auth_home_path']) === removeSlash(path.split('_')[1])) {
                     sections[0].setAttribute('class', 'selected-item')
-
                 } else {
                     sections[0].setAttribute('class', 'unselected-item')
                 }
@@ -55,13 +71,20 @@ async function getCurrentDirectory() {
 
             console.log(json)
             showDirectory(json['data'])
+        } else if (json.status === 'Unauthorized') {
+            // Handle unauthorized access
+            window.location.reload()
         } else {
             alert('404 Current Directory Not Found')
         }
     }
     catch (err) {
         console.log(err)
-        alert('404 Current Directory Not Found')
+        if (err.status === 'Unauthorized') {
+            window.location.reload()
+        } else {
+            alert('404 Current Directory Not Found')
+        }
     }
 }
 
@@ -416,3 +439,32 @@ function showToast(message) {
         }, 2000);
     }, 100);
 }
+
+// Add function to check session status
+async function checkSession() {
+    try {
+        const json = await postJson('/api/checkSession', {})
+        return json.status === 'ok'
+    } catch (err) {
+        console.error('Session check failed:', err)
+        return false
+    }
+}
+
+// Add logout function
+async function logout() {
+    try {
+        await postJson('/api/logout', {})
+        window.location.reload()
+    } catch (err) {
+        console.error('Logout failed:', err)
+    }
+}
+
+// Add periodic session check
+setInterval(async () => {
+    const isLoggedIn = await checkSession();
+    if (!isLoggedIn) {
+        window.location.reload();
+    }
+}, 60000); // Check every minute
