@@ -171,10 +171,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (getCurrentPath().includes('/share_')) {
         getCurrentDirectory()
     } else {
-        if (getPassword() === null) {
+        if (!getPassword()) {
             document.getElementById('bg-blur').style.zIndex = '2';
             document.getElementById('bg-blur').style.opacity = '0.1';
-
             document.getElementById('get-password').style.zIndex = '3';
             document.getElementById('get-password').style.opacity = '1';
         } else {
@@ -182,3 +181,39 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 });
+
+async function getCurrentDirectory() {
+    let path = getCurrentPath()
+    if (path === 'redirect') {
+        return
+    }
+    try {
+        const auth = getFolderAuthFromPath()
+        const data = { 'path': path, 'auth': auth }
+        const json = await postJson('/api/getDirectory', data)
+
+        if (json.status === 'ok') {
+            if (getCurrentPath().startsWith('/share')) {
+                const sections = document.querySelector('.sidebar-menu').getElementsByTagName('a')
+                if (removeSlash(json['auth_home_path']) === removeSlash(path.split('_')[1])) {
+                    sections[0].setAttribute('class', 'selected-item')
+                } else {
+                    sections[0].setAttribute('class', 'unselected-item')
+                }
+                sections[0].href = `/?path=/share_${removeSlash(json['auth_home_path'])}&auth=${auth}`
+            }
+            showDirectory(json['data'])
+        } else {
+            if (json.message === 'Access denied') {
+                window.location.reload() // Force re-login
+            } else {
+                alert(json.message || 'Error loading directory')
+            }
+        }
+    }
+    catch (err) {
+        console.error(err)
+        alert('Error loading directory. Please try logging in again.')
+        window.location.reload()
+    }
+}

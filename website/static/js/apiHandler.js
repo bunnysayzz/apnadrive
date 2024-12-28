@@ -11,19 +11,21 @@ async function postJson(url, data) {
     return await response.json()
 }
 
+function getPassword() {
+    return document.cookie.split('; ').find(row => row.startsWith('admin_auth='))?.split('=')[1] || null;
+}
+
 document.getElementById('pass-login').addEventListener('click', async () => {
     const password = document.getElementById('auth-pass').value
     const data = { 'pass': password }
     const json = await postJson('/api/checkPassword', data)
     if (json.status === 'ok') {
-        localStorage.setItem('password', password)
-        alert('Logged In Successfully')
+        document.cookie = `admin_auth=${password};path=/;samesite=strict`;
         window.location.reload()
     }
     else {
         alert('Wrong Password')
     }
-
 })
 
 async function getCurrentDirectory() {

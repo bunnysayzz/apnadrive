@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 from contextlib import asynccontextmanager
 import aiofiles
-from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form, Response
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form, Response, Cookie
 from fastapi.responses import FileResponse, JSONResponse
 from config import ADMIN_PASSWORD, MAX_FILE_SIZE, STORAGE_CHANNEL
 from utils.clients import initialize_clients
@@ -16,6 +16,7 @@ from utils.streamer import media_streamer
 from utils.uploader import start_file_uploader
 from utils.logger import Logger
 import urllib.parse
+from typing import Optional
 
 
 # Startup Event
@@ -70,9 +71,16 @@ async def dl_file(request: Request):
 
 
 @app.post("/api/checkPassword")
-async def check_password(request: Request):
+async def check_password(request: Request, response: Response):
     data = await request.json()
     if data["pass"] == ADMIN_PASSWORD:
+        response.set_cookie(
+            key="admin_auth",
+            value=ADMIN_PASSWORD,
+            httponly=True,
+            samesite="strict",
+            secure=True  # Enable for HTTPS
+        )
         return JSONResponse({"status": "ok"})
     return JSONResponse({"status": "Invalid password"})
 
@@ -103,45 +111,53 @@ async def api_new_folder(request: Request):
 
 
 @app.post("/api/getDirectory")
-async def api_get_directory(request: Request):
+async def api_get_directory(
+    request: Request,
+    admin_auth: Optional[str] = Cookie(None)
+):
     from utils.directoryHandler import DRIVE_DATA
 
     data = await request.json()
-
-    if data["password"] == ADMIN_PASSWORD:
+    
+    # Check auth cookie instead of password field
+    if admin_auth == ADMIN_PASSWORD:
         is_admin = True
     else:
         is_admin = False
 
     auth = data.get("auth")
-
     logger.info(f"getFolder {data}")
 
-    if data["path"] == "/trash":
-        data = {"contents": DRIVE_DATA.get_trashed_files_folders()}
-        folder_data = convert_class_to_dict(data, isObject=False, showtrash=True)
+    try:
+        if data["path"] == "/trash":
+            data = {"contents": DRIVE_DATA.get_trashed_files_folders()}
+            folder_data = convert_class_to_dict(data, isObject=False, showtrash=True)
 
-    elif "/search_" in data["path"]:
-        query = urllib.parse.unquote(data["path"].split("_", 1)[1])
-        print(query)
-        data = {"contents": DRIVE_DATA.search_file_folder(query)}
-        print(data)
-        folder_data = convert_class_to_dict(data, isObject=False, showtrash=False)
-        print(folder_data)
+        elif "/search_" in data["path"]:
+            query = urllib.parse.unquote(data["path"].split("_", 1)[1])
+            data = {"contents": DRIVE_DATA.search_file_folder(query)}
+            folder_data = convert_class_to_dict(data, isObject=False, showtrash=False)
 
-    elif "/share_" in data["path"]:
-        path = data["path"].split("_", 1)[1]
-        folder_data, auth_home_path = DRIVE_DATA.get_directory(path, is_admin, auth)
-        auth_home_path= auth_home_path.replace("//", "/") if auth_home_path else None
-        folder_data = convert_class_to_dict(folder_data, isObject=True, showtrash=False)
-        return JSONResponse(
-            {"status": "ok", "data": folder_data, "auth_home_path": auth_home_path}
-        )
+        elif "/share_" in data["path"]:
+            path = data["path"].split("_", 1)[1]
+            folder_data, auth_home_path = DRIVE_DATA.get_directory(path, is_admin, auth)
+            auth_home_path = auth_home_path.replace("//", "/") if auth_home_path else None
+            folder_data = convert_class_to_dict(folder_data, isObject=True, showtrash=False)
+            return JSONResponse(
+                {"status": "ok", "data": folder_data, "auth_home_path": auth_home_path}
+            )
 
-    else:
-        folder_data = DRIVE_DATA.get_directory(data["path"])
-        folder_data = convert_class_to_dict(folder_data, isObject=True, showtrash=False)
-    return JSONResponse({"status": "ok", "data": folder_data, "auth_home_path": None})
+        else:
+            folder_data = DRIVE_DATA.get_directory(data["path"], is_admin)
+            if not folder_data:
+                return JSONResponse({"status": "error", "message": "Access denied"})
+            folder_data = convert_class_to_dict(folder_data, isObject=True, showtrash=False)
+            
+        return JSONResponse({"status": "ok", "data": folder_data, "auth_home_path": None})
+        
+    except Exception as e:
+        logger.error(f"Error getting directory: {str(e)}")
+        return JSONResponse({"status": "error", "message": str(e)})
 
 
 SAVE_PROGRESS = {}
