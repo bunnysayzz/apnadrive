@@ -711,3 +711,346 @@
 .reload-btn:hover {
     background-color: #1557b0;
 }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr; /* Stack sidebar and main content */
+    }
+
+    .sidebar {
+        position: fixed; /* Make sidebar fixed on top */
+        width: 100%; /* Full width */
+        height: 60px; /* Reduce height */
+        display: flex;
+        align-items: center;
+        justify-content: space-between; /* Space out elements */
+        padding: 0 10px;
+        background-color: #f8fafd; /* Consistent with the design */
+        border-bottom: 1px solid #ccc; /* Add a subtle border */
+        z-index: 1000; /* Ensure it's above other content */
+    }
+
+    .main-content {
+        margin-top: 60px; /* Push down content below the fixed sidebar */
+    }
+
+    .grid-container {
+        padding: 10px; /* Reduce padding */
+    }
+
+    .grid-item {
+        flex-direction: column; /* Stack image and text vertically */
+    }
+
+    .item-preview {
+        width: 100%; /* Full width images */
+        height: auto; /* Maintain aspect ratio */
+    }
+
+    .item-details {
+        padding: 8px; /* Reduce padding */
+    }
+
+    .new-upload, .more-options, .create-new-folder, .file-uploader {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%; /* Use more screen width */
+        max-width: none; /* Override max-width */
+    }
+}
+
+/* Adjustments for very small screens */
+@media (max-width: 480px) {
+    .grid-container {
+        grid-template-columns: 1fr; /* Single column for very small screens */
+    }
+}
+
+/* Adjust button sizes and interactions */
+.button, .more-btn {
+    padding: 12px; /* Larger touch targets */
+    font-size: 16px; /* Larger font for readability */
+}
+
+/* Improve form elements for touch interactions */
+input[type="text"], input[type="password"], button {
+    height: 44px; /* Easier to interact with on touch devices */
+    font-size: 16px; /* Larger font size */
+}
+
+/* Media Modal Styles */
+.media-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.modal-content {
+    position: fixed;
+    background-color: #fefefe;
+    width: 90%;
+    height: 90vh;
+    max-width: 1200px;
+    max-height: 90vh;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    padding: 40px 20px 20px 20px;
+}
+
+.media-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    position: relative;
+}
+
+.media-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    margin: auto;
+    display: block;
+}
+
+.media-container video {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.close-modal {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    color: #444;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10;
+    background: #fff;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.close-modal:hover {
+    color: #000;
+    background: #f1f1f1;
+}
+
+/* Media Modal Responsive */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        height: 80vh;
+        padding: 35px 10px 10px 10px;
+    }
+}
+
+/* Loading Animation Styles */
+.loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 5;
+}
+
+.media-loading {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Pulse animation for background */
+.loading-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #f8f9fa;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 0.8; }
+    100% { opacity: 0.6; }
+}
+
+/* Download Button Styles */
+.download-modal-btn {
+    position: absolute;
+    right: 60px;
+    top: 10px;
+    background: #fff;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s ease;
+}
+
+.download-modal-btn:hover {
+    background: #f1f1f1;
+    transform: translateY(1px);
+}
+
+.download-modal-btn svg {
+    width: 16px;
+    height: 16px;
+    color: #444;
+}
+
+/* Media Modal Responsive Styles */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        padding: 45px 10px 10px 10px;
+        border-radius: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        transform: none;
+    }
+
+    .media-container {
+        height: calc(100% - 45px);
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .media-container img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+    }
+
+    .media-container video {
+        width: 100%;
+        height: auto;
+        max-height: calc(100vh - 60px);
+    }
+
+    /* Adjust control buttons for mobile */
+    .close-modal,
+    .download-modal-btn {
+        width: 40px;
+        height: 40px;
+        top: 5px;
+    }
+
+    .close-modal {
+        right: 10px;
+    }
+
+    .download-modal-btn {
+        right: 60px;
+    }
+
+    .close-modal svg,
+    .download-modal-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Loading spinner adjustments for mobile */
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* Error message adjustments for mobile */
+    .media-error {
+        width: 90%;
+        padding: 15px;
+        font-size: 14px;
+    }
+}
+
+/* Additional adjustments for very small screens */
+@media (max-width: 480px) {
+    .modal-content {
+        padding-top: 40px;
+    }
+
+    .close-modal,
+    .download-modal-btn {
+        width: 35px;
+        height: 35px;
+    }
+
+    .download-modal-btn {
+        right: 50px;
+    }
+
+    .media-container {
+        height: calc(100% - 40px);
+    }
+}
+
+/* Touch-specific improvements */
+@media (hover: none) {
+    .close-modal,
+    .download-modal-btn {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .close-modal:active,
+    .download-modal-btn:active {
+        background: rgba(200, 200, 200, 0.9);
+        transform: scale(0.95);
+    }
+}
+
+/* Add to the existing .sidebar-menu styles */
+.sidebar-menu a#logout-btn {
+    margin-top: auto;  /* This will push the logout to the bottom */
+    color: #d93025;    /* Red color for logout */
+}
+
+.sidebar-menu a#logout-btn:hover {
+    background-color: rgba(217, 48, 37, 0.1);
+}

@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 async def generate_thumbnail(file):
     client = get_client()
+    temp_files = []  # Track temporary files
+    
     try:
         logger.info(f"Generating thumbnail for file: {file.id}")
         message = await client.get_messages(STORAGE_CHANNEL, file.file_id)
@@ -28,16 +30,17 @@ async def generate_thumbnail(file):
             try:
                 logger.info("Using Telegram video thumbnail")
                 thumb_file = await client.download_media(message.video.thumbs[0].file_id)
+                temp_files.append(thumb_file)
                 return await process_image_thumbnail(thumb_file)
             except Exception as e:
                 logger.error(f"Failed to get Telegram video thumbnail: {str(e)}")
-                # Continue to try other methods
 
         # For images
         if message.document and message.document.mime_type.startswith('image/'):
             try:
                 logger.info("Processing image file")
                 file_path = await message.download()
+                temp_files.append(file_path)
                 return await process_image_thumbnail(file_path)
             except Exception as e:
                 logger.error(f"Failed to process image: {str(e)}")
@@ -47,15 +50,15 @@ async def generate_thumbnail(file):
         if message.video:
             try:
                 logger.info("Generating video thumbnail")
-                # Stream only first 1MB for faster processing
                 temp_path = f"temp_video_{file.id}.mp4"
+                temp_files.append(temp_path)
+                
                 try:
                     async with client.stream_media(message, limit=1024*1024) as stream:
                         with open(temp_path, 'wb') as f:
                             async for chunk in stream:
                                 f.write(chunk)
 
-                    # Extract frame from the beginning
                     process = await asyncio.create_subprocess_exec(
                         'ffmpeg', '-ss', '0', '-i', temp_path,
                         '-vf', 'scale=400:400:force_original_aspect_ratio=decrease',
@@ -72,8 +75,8 @@ async def generate_thumbnail(file):
                     raise Exception("FFmpeg failed")
 
                 finally:
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
+                    # Cleanup is handled in the outer finally block
+                    pass
 
             except Exception as e:
                 logger.error(f"Video thumbnail generation failed: {str(e)}")
@@ -84,6 +87,15 @@ async def generate_thumbnail(file):
     except Exception as e:
         logger.error(f"Thumbnail generation failed: {str(e)}")
         return create_default_thumbnail("Error")
+        
+    finally:
+        # Clean up all temporary files
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception as e:
+                logger.error(f"Failed to remove temp file {temp_file}: {e}")
 
 async def process_image_thumbnail(file_path):
     try:

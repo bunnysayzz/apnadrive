@@ -1,22 +1,208 @@
-function openFolder() {
-    let path = (getCurrentPath() + '/' + this.getAttribute('data-id') + '/').replaceAll('//', '/')
+// Ensure all content is loaded before setting up handlers
+document.addEventListener('DOMContentLoaded', function () {
+    setupClickHandlers();
+});
 
-    const auth = getFolderAuthFromPath()
+function setupClickHandlers() {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const openEvent = 'click'; // Use click for both mobile and desktop for simplicity
+
+    document.querySelectorAll('.grid-item.folder, .grid-item.file').forEach(item => {
+        item.removeEventListener('dblclick', openFolder); // Clean up previous event listeners
+        item.removeEventListener('click', openFolder);
+        item.removeEventListener('dblclick', openFile);
+        item.removeEventListener('click', openFile);
+
+        item.addEventListener(openEvent, function() {
+            if (this.classList.contains('folder')) {
+                openFolder.call(this);
+            } else if (this.classList.contains('file')) {
+                openFile.call(this);
+            }
+        });
+    });
+}
+
+function openFolder() {
+    let path = (getCurrentPath() + '/' + this.getAttribute('data-id') + '/').replaceAll('//', '/');
+    const auth = getFolderAuthFromPath();
     if (auth) {
-        path = path + '&auth=' + auth
+        path += '&auth=' + auth;
     }
-    window.location.href = `/?path=${path}`
+    window.location.href = `/?path=${path}`;
 }
 
 function openFile() {
-    const fileName = this.getAttribute('data-name').toLowerCase()
-    let path = '/file?path=' + this.getAttribute('data-path') + '/' + this.getAttribute('data-id')
+    const fileName = this.getAttribute('data-name').toLowerCase();
+    const path = '/file?path=' + this.getAttribute('data-path') + '/' + this.getAttribute('data-id');
+    
+    // Check if file is media
+    if (isMediaFile(fileName)) {
+        openMediaModal(path, fileName);
+    } else {
+        window.open(path, '_blank');
+    }
+}
 
-    if (fileName.endsWith('.mp4') || fileName.endsWith('.mkv') || fileName.endsWith('.webm') || fileName.endsWith('.mov') || fileName.endsWith('.avi') || fileName.endsWith('.ts') || fileName.endsWith('.ogv')) {
-        path = '/stream?url=' + getRootUrl() + path
+function isMediaFile(fileName) {
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const videoExts = ['.mp4', '.webm', '.mkv', '.mov', '.avi'];
+    
+    return [...imageExts, ...videoExts].some(ext => fileName.endsWith(ext));
+}
+
+function openMediaModal(path, fileName) {
+    const modal = document.getElementById('mediaModal');
+    const container = modal.querySelector('.media-container');
+    const isVideo = fileName.match(/\.(mp4|webm|mkv|mov|avi)$/i);
+    
+    // Prevent body scrolling when modal is open
+    document.body.style.overflow = 'hidden';
+    
+    // Clear previous content
+    container.innerHTML = `
+        <div class="loading-background"></div>
+        <div class="loading-spinner"></div>
+    `;
+    
+    // Add download button
+    const downloadBtn = document.createElement('div');
+    downloadBtn.className = 'download-modal-btn';
+    downloadBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+    `;
+    
+    // Add touch event handlers
+    downloadBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        downloadMedia(path, fileName);
+    });
+    downloadBtn.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+        downloadMedia(path, fileName);
+    });
+    
+    modal.querySelector('.modal-content').appendChild(downloadBtn);
+
+    // Show modal
+    modal.style.display = 'block';
+    setTimeout(() => modal.style.opacity = '1', 10);
+
+    if (isVideo) {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.autoplay = false;
+        video.playsInline = true; // Better mobile video handling
+        video.classList.add('media-loading');
+        
+        video.onloadeddata = () => {
+            container.querySelector('.loading-spinner')?.remove();
+            container.querySelector('.loading-background')?.remove();
+            video.style.opacity = '1';
+        };
+
+        video.onerror = () => {
+            handleMediaError(container, 'Failed to load video');
+        };
+
+        video.src = path;
+        container.appendChild(video);
+    } else {
+        const img = document.createElement('img');
+        img.classList.add('media-loading');
+        
+        img.onload = () => {
+            container.querySelector('.loading-spinner')?.remove();
+            container.querySelector('.loading-background')?.remove();
+            img.style.opacity = '1';
+        };
+
+        img.onerror = () => {
+            handleMediaError(container, 'Failed to load image');
+        };
+
+        img.src = path;
+        container.appendChild(img);
     }
 
-    window.open(path, '_blank')
+    // Update close handlers for better mobile support
+    const closeBtn = modal.querySelector('.close-modal');
+    const closeModal = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeMediaModal();
+    };
+    
+    closeBtn.addEventListener('click', closeModal);
+    closeBtn.addEventListener('touchend', closeModal);
+
+    // Close on outside click/touch
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeMediaModal();
+    });
+    modal.addEventListener('touchend', (e) => {
+        if (e.target === modal) closeMediaModal();
+    });
+
+    // Handle escape key
+    document.addEventListener('keydown', handleEscKey);
+}
+
+function handleMediaError(container, message) {
+    container.innerHTML = `
+        <div style="
+            text-align: center;
+            color: #dc3545;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1)
+        ">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p style="margin-top: 10px">${message}</p>
+        </div>
+    `;
+}
+
+function closeMediaModal() {
+    const modal = document.getElementById('mediaModal');
+    const container = modal.querySelector('.media-container');
+    
+    // Re-enable body scrolling
+    document.body.style.overflow = '';
+    
+    modal.style.opacity = '0';
+    
+    const video = container.querySelector('video');
+    if (video) {
+        video.pause();
+        video.src = '';
+    }
+    
+    setTimeout(() => {
+        modal.style.display = 'none';
+        container.innerHTML = '';
+        const downloadBtn = modal.querySelector('.download-modal-btn');
+        if (downloadBtn) {
+            downloadBtn.remove();
+        }
+    }, 300);
+
+    document.removeEventListener('keydown', handleEscKey);
+}
+
+function handleEscKey(e) {
+    if (e.key === 'Escape') {
+        closeMediaModal();
+    }
 }
 
 
@@ -212,3 +398,23 @@ async function shareFolder() {
 }
 
 // File More Button Handler  End
+
+// Add this new function for handling downloads
+function downloadMedia(path, fileName) {
+    // Create temporary link
+    const link = document.createElement('a');
+    link.href = path;
+    link.download = fileName; // Set suggested filename
+    
+    // Append to document temporarily
+    document.body.appendChild(link);
+    
+    // Show loading toast
+    showToast('Starting download...');
+    
+    // Trigger download
+    link.click();
+    
+    // Clean up
+    document.body.removeChild(link);
+}

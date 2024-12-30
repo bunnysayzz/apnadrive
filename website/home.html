@@ -52,6 +52,7 @@
             <div class="sidebar-menu">
                 <a class="selected-item" href="/?path=/"><img src="static/assets/home-icon.svg" />Home</a>
                 <a class="unselected-item" href="/?path=/trash"><img src="static/assets/trash-icon.svg" />Trash</a>
+                <a class="unselected-item" href="#" id="logout-btn"><img src="static/assets/logout-icon.svg" />Logout</a>
             </div>
         </div>
         <!-- Sidebar End -->
@@ -156,6 +157,16 @@
     <script src="static/js/sidebar.js"></script>
     <script src="static/js/fileClickHandler.js"></script>
     <script src="static/js/main.js"></script>
+
+    <!-- Media Modal -->
+    <div id="mediaModal" class="media-modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div class="media-container">
+                <!-- Media content will be inserted here -->
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

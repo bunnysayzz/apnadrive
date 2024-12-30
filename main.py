@@ -17,6 +17,8 @@ from utils.uploader import start_file_uploader
 from utils.logger import Logger
 import urllib.parse
 from typing import Optional
+import time
+import os
 
 
 # Startup Event
@@ -30,6 +32,9 @@ async def lifespan(app: FastAPI):
 
     # Start the website auto ping task
     asyncio.create_task(auto_ping_website())
+
+    # Add this line
+    asyncio.create_task(cleanup_cache())
 
     yield
 
@@ -384,3 +389,30 @@ async def get_thumbnail(path: str):
     except Exception as e:
         logger.error(f"Thumbnail generation error: {e}")
         return Response(status_code=404)
+
+
+async def cleanup_cache():
+    """Periodically clean up the cache directory"""
+    while True:
+        try:
+            cache_dir = Path("./cache")
+            current_time = time.time()
+            
+            for file_path in cache_dir.iterdir():
+                try:
+                    # Skip important files
+                    if (file_path.suffix in ['.session', '.session-journal'] or 
+                        file_path.name == 'drive.data'):
+                        continue
+                        
+                    # Remove files older than 1 hour
+                    if current_time - file_path.stat().st_mtime > 3600:
+                        os.remove(file_path)
+                        logger.info(f"Cleaned up old cache file: {file_path}")
+                except Exception as e:
+                    logger.error(f"Error cleaning up {file_path}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Cache cleanup error: {e}")
+            
+        await asyncio.sleep(1800)  # Run every 30 minutes

@@ -418,3 +418,11 @@ function showToast(message) {
         }, 2000);
     }, 100);
 }
+
+document.getElementById('logout-btn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    // Delete the admin_auth cookie
+    document.cookie = 'admin_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    // Reload the page to show login prompt
+    window.location.reload();
+});
