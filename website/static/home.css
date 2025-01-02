@@ -529,6 +529,9 @@
     overflow: auto;
     padding: 0;
     background-color: #fff;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
 }
 
 /* Grid Layout Styles */
@@ -539,6 +542,8 @@
     padding: 24px;
     max-width: 1600px;
     margin: 0 auto;
+    position: relative;
+    z-index: 2;
 }
 
 .grid-item {
@@ -548,6 +553,9 @@
     transition: all 0.3s ease;
     cursor: pointer;
     border: 1px solid #e0e0e0;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
 }
 
 .grid-item:hover {
@@ -759,6 +767,17 @@
         transform: translate(-50%, -50%);
         width: 90%; /* Use more screen width */
         max-width: none; /* Override max-width */
+    }
+
+    .directory {
+        margin-top: 60px; /* Adjust for fixed header */
+        height: calc(100vh - 60px);
+        z-index: 1;
+    }
+
+    .grid-container {
+        position: relative;
+        z-index: 2;
     }
 }
 
@@ -1053,4 +1072,58 @@ input[type="text"], input[type="password"], button {
 
 .sidebar-menu a#logout-btn:hover {
     background-color: rgba(217, 48, 37, 0.1);
+}
+
+/* Media Query for Mobile Devices */
+@media (max-width: 768px) {
+    /* Ensure the new upload panel is hidden by default and only shows when explicitly triggered */
+    #new-upload {
+        visibility: hidden; /* Hide the new upload panel by default */
+        opacity: 0;
+        transition: visibility 0s, opacity 0.5s linear;
+    }
+
+    /* Show the new upload panel when the new button is clicked */
+    #new-button:active + #new-upload,
+    #new-button:focus + #new-upload {
+        visibility: visible;
+        opacity: 1;
+        top: 60px; /* Adjust position to not overlap with the login panel */
+    }
+
+    /* Adjust the login panel to ensure it stays in place when focused */
+    #get-password {
+        position: fixed;
+        top: 50%; /* Center vertically */
+        left: 50%; /* Center horizontally */
+        transform: translate(-50%, -50%);
+        z-index: -1; /* Hide it by default */
+        opacity: 0;
+        pointer-events: none; /* Disable pointer events when hidden */
+    }
+
+    #get-password.show {
+        z-index: 1000; /* Show above everything when needed */
+        opacity: 1;
+        pointer-events: auto; /* Enable pointer events when visible */
+    }
+
+    /* Adjustments to prevent login panel from triggering other interactive elements */
+    #auth-pass:focus {
+        outline: none; /* Remove outline that might cause layout shift */
+    }
+
+    /* Ensure that clicking on the login input does not trigger background elements */
+    #get-password * {
+        pointer-events: auto; /* Enable pointer events for all elements in the login panel */
+    }
+
+    /* Adjust the visibility and interactivity of the logout button */
+    #logout-btn {
+        position: fixed;
+        bottom: 10px; /* Position at the bottom */
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%; /* Full width within the sidebar */
+    }
 }

@@ -100,3 +100,17 @@ document.getElementById('remote-cancel').addEventListener('click', () => {
 document.getElementById('remote-start').addEventListener('click', Start_URL_Upload);
 
 // New Url Upload End
+
+// Example function to open a modal
+function openModal() {
+    const modal = document.getElementById('create-new-folder');
+    modal.classList.add('active');
+    document.getElementById('bg-blur').classList.add('active');
+}
+
+// Example function to close a modal
+function closeModal() {
+    const modal = document.getElementById('create-new-folder');
+    modal.classList.remove('active');
+    document.getElementById('bg-blur').classList.remove('active');
+}

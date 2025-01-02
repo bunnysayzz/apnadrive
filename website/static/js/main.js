@@ -42,8 +42,8 @@ function showDirectory(data) {
                 html += `<div data-path="${item.path}" id="more-option-${item.id}" data-name="${item.name}" class="more-options">
                     <input class="more-options-focus" readonly="readonly" style="height:0;width:0;border:none;position:absolute">
                     <div id="rename-${item.id}"><img src="static/assets/pencil-icon.svg"> Rename</div>
-                    <hr>
-                    <div id="trash-${item.id}"><img src="static/assets/trash-icon.svg"> Trash</div>
+                    <!-- <hr>
+                    <div id="trash-${item.id}"><img src="static/assets/trash-icon.svg"> Trash</div> -->
                     <hr>
                     <div id="folder-share-${item.id}"><img src="static/assets/share-icon.svg"> Share</div>
                 </div>`
@@ -92,8 +92,8 @@ function showDirectory(data) {
                 html += `<div data-path="${item.path}" id="more-option-${item.id}" data-name="${item.name}" class="more-options">
                     <input class="more-options-focus" readonly="readonly" style="height:0;width:0;border:none;position:absolute">
                     <div id="rename-${item.id}"><img src="static/assets/pencil-icon.svg"> Rename</div>
-                    <hr>
-                    <div id="trash-${item.id}"><img src="static/assets/trash-icon.svg"> Trash</div>
+                    <!-- <hr>
+                    <div id="trash-${item.id}"><img src="static/assets/trash-icon.svg"> Trash</div> -->
                     <hr>
                     <div id="share-${item.id}"><img src="static/assets/share-icon.svg"> Share</div>
                 </div>`
